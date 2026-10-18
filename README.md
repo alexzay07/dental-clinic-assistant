@@ -208,14 +208,29 @@ Telegram bot:
 
 ## Screenshots
 
-Add sanitized screenshots to the `assets/` directory:
+### Project cover
 
-- `cover.png`
-- `telegram-menu.png`
-- `appointment-flow.png`
-- `admin-notification.png`
-- `salebot-table.png`
-- `salebot-workflow.png`
+![Dental Clinic Assistant](assets/cover.png)
+
+### Telegram main menu and FAQ
+
+![Telegram menu](assets/telegram-menu.png)
+
+### Appointment booking flow
+
+![Appointment flow](assets/appointment-flow.png)
+
+### Administrator notification
+
+![Administrator notification](assets/admin-notification.png)
+
+### SaleBot requests table
+
+![SaleBot requests table](assets/salebot-table.png)
+
+### SaleBot workflow
+
+![SaleBot workflow](assets/salebot-workflow.png)
 
 Do not publish real patient data, phone numbers, tokens, API keys, administrator identifiers, or other sensitive information.
 
