@@ -1,0 +1,156 @@
+flowchart TD
+
+    %% =========================================================
+    %% DENTAL CLINIC ASSISTANT — SALEBOT
+    %% =========================================================
+
+    INFO["Dental Clinic Assistant — прототип чат-бота для стоматологической клиники<br/><br/>
+    Цели:<br/>
+    1. Упростить первичную запись пациента на приём.<br/>
+    2. Сократить время ожидания ответа администратора.<br/>
+    3. Снизить нагрузку на администратора за счёт автоматизации FAQ и сбора заявки.<br/>
+    4. Структурированно сохранять данные пациента и параметры заявки.<br/><br/>
+    Задачи:<br/>
+    1. Показать главное меню и основные разделы клиники.<br/>
+    2. Предоставить информацию об услугах, ценах и частых вопросах.<br/>
+    3. Собрать имя, телефон, услугу, желаемые дату и время.<br/>
+    4. Проверить корректность номера телефона.<br/>
+    5. Показать пользователю итог заявки перед подтверждением.<br/>
+    6. Сохранить подтверждённую заявку в таблицу SaleBot.<br/>
+    7. Отправить сформированную заявку в индивидуальный Telegram администратора.<br/>
+    8. Дать возможность задать вопрос администратору.<br/>
+    9. Обработать ошибочный ввод и повторное нажатие кнопок.<br/><br/>
+    Текущая архитектура:<br/>
+    Telegram → SaleBot → Таблица SaleBot → Telegram администратора<br/><br/>
+    Следующий этап:<br/>
+    перенос бизнес-логики в self-hosted n8n с подключением БД, календаря, CRM и AI"]:::info
+
+    TG["Пациент<br/>Telegram-бот<br/>@Dental_clinic_bcn_assistant_bot"]:::channel
+    START(["START<br/>/start; старт; начать"]):::start
+    MENU["ГЛАВНОЕ МЕНЮ<br/>Запись / Услуги / Цены / FAQ / Администратор"]:::nav
+
+    INFO --> TG
+    TG --> START
+    START --> MENU
+
+    %% ---------- ИНФОРМАЦИОННЫЕ ВЕТКИ ----------
+    SERVICES["УСЛУГИ<br/>Список направлений клиники"]:::nav
+    PRICES["ЦЕНЫ<br/>Прайс / базовая информация"]:::nav
+    FAQ["FAQ<br/>Частые вопросы"]:::nav
+
+    MENU -->|Услуги| SERVICES
+    MENU -->|Цены| PRICES
+    MENU -->|FAQ| FAQ
+
+    SERVICES -->|Главное меню| MENU
+    PRICES -->|Главное меню| MENU
+    FAQ -->|Главное меню| MENU
+
+    %% ---------- ВЕТКА АДМИНИСТРАТОРА ----------
+    ADMIN_Q["ВОПРОС АДМИНИСТРАТОРУ<br/>Ввод одного сообщения"]:::admin
+    ADMIN_SAVE["Сохранить<br/>admin_question<br/>admin_request_status = new"]:::admin
+    ADMIN_OK["ВОПРОС ПРИНЯТ<br/>Подтверждение пользователю"]:::success
+
+    MENU -->|Связаться с администратором| ADMIN_Q
+    FAQ -->|Администратор| ADMIN_Q
+    ADMIN_Q -->|read_data: admin_question| ADMIN_SAVE
+    ADMIN_SAVE --> ADMIN_OK
+    ADMIN_OK --> MENU
+
+    %% ---------- ОСНОВНОЙ СЦЕНАРИЙ ЗАПИСИ ----------
+    SERVICE["ЗАПИСЬ: УСЛУГА<br/>Выбор услуги"]:::booking
+    NAME["ЗАПИСЬ: ИМЯ<br/>read_data: patient_name"]:::booking
+    PHONE["ЗАПИСЬ: ТЕЛЕФОН<br/>read_data: patient_phone"]:::booking
+    PHONE_CHECK{"Телефон<br/>валиден?"}:::decision
+    PHONE_ERR["ОШИБКА ТЕЛЕФОНА<br/>Повторить ввод"]:::error
+    DATE["ЗАПИСЬ: ДАТА<br/>read_data: preferred_date"]:::booking
+    TIME["ЗАПИСЬ: ВРЕМЯ<br/>read_data: preferred_time"]:::booking
+    CONFIRM["ЗАПИСЬ: ПОДТВЕРЖДЕНИЕ<br/>Пациент / Телефон / Услуга / Дата / Время"]:::booking
+    SUCCESS["ЗАПИСЬ: УСПЕХ<br/>appointment_status = new"]:::success
+    CANCEL["ЗАПИСЬ: ОТМЕНА"]:::error
+
+    MENU -->|Записаться на прием| SERVICE
+
+    SERVICE -->|Консультация| NAME
+    SERVICE -->|Профгигиена| NAME
+    SERVICE -->|Лечение зуба| NAME
+    SERVICE -->|Имплантация| NAME
+    SERVICE -->|Ортодонтия| NAME
+
+    NAME -->|patient_name| PHONE
+    PHONE --> PHONE_CHECK
+    PHONE_CHECK -->|Да| DATE
+    PHONE_CHECK -->|Нет| PHONE_ERR
+    PHONE_ERR --> PHONE
+
+    DATE -->|preferred_date| TIME
+    TIME -->|preferred_time| CONFIRM
+    CONFIRM -->|Подтвердить| SUCCESS
+    CONFIRM -->|Отменить| CANCEL
+    CANCEL --> MENU
+    SUCCESS --> MENU
+
+    %% ---------- ЗАЩИТА ОТ ПОВТОРНОГО НАЖАТИЯ ----------
+    INTERCEPT["ПЕРЕХВАТЧИК УСЛУГ<br/>Консультация / Профгигиена / Лечение зуба / Имплантация / Ортодонтия"]:::guard
+
+    NAME -. повторная кнопка услуги .-> INTERCEPT
+    PHONE -. повторная кнопка услуги .-> INTERCEPT
+    DATE -. повторная кнопка услуги .-> INTERCEPT
+    TIME -. повторная кнопка услуги .-> INTERCEPT
+    INTERCEPT --> SERVICE
+
+    %% ---------- ДАННЫЕ И УВЕДОМЛЕНИЯ ----------
+    TABLE[("Таблица SaleBot<br/>Заявки клиники<br/><br/>created_at<br/>platform_id<br/>patient_name<br/>patient_phone<br/>service<br/>preferred_date<br/>preferred_time<br/>status = new")]:::data
+
+    ADMIN_TG["Индивидуальный Telegram администратора<br/>Новая заявка:<br/>Имя / Телефон / Услуга / Дата / Время"]:::integration
+
+    SUCCESS -->|new_record| TABLE
+    SUCCESS -->|Отправить заявку| ADMIN_TG
+
+    %% ---------- ПЛАНИРУЕМОЕ РАЗВИТИЕ ----------
+    subgraph FUTURE["ПЛАНИРУЕМОЕ РАЗВИТИЕ PRODUCTION-ВЕРСИИ"]
+        direction TB
+        N8N["Self-hosted n8n"]:::future
+        DB[("PostgreSQL")]:::future
+        CAL["Google Calendar"]:::future
+        CRM["CRM"]:::future
+        AI["AI services"]:::future
+
+        N8N --> DB
+        N8N --> CAL
+        N8N --> CRM
+        N8N --> AI
+    end
+
+    TABLE -. следующий этап .-> N8N
+    ADMIN_TG -. следующий этап .-> N8N
+
+    %% ---------- ЛЕГЕНДА ----------
+    subgraph LEGEND["ЛЕГЕНДА"]
+        direction LR
+        L1(["Старт / успех"]):::start
+        L2["Навигация / информация"]:::nav
+        L3["Сценарий записи"]:::booking
+        L4["Администратор"]:::admin
+        L5["Данные / интеграции"]:::data
+        L6["Ошибка / отмена"]:::error
+        L7["Будущее развитие"]:::future
+    end
+
+    %% ---------- СТИЛИ ----------
+    classDef info fill:#FFFFFF,stroke:#444444,stroke-width:2px,color:#111;
+    classDef channel fill:#E8F0FE,stroke:#4A6FA5,stroke-width:2px,color:#111;
+    classDef start fill:#D9EAD3,stroke:#6AA84F,stroke-width:2px,color:#111;
+    classDef success fill:#D9EAD3,stroke:#6AA84F,stroke-width:2px,color:#111;
+    classDef nav fill:#D9EAF7,stroke:#5B9BD5,stroke-width:2px,color:#111;
+    classDef booking fill:#FFF2CC,stroke:#D6B656,stroke-width:2px,color:#111;
+    classDef decision fill:#FCE5CD,stroke:#E69138,stroke-width:2px,color:#111;
+    classDef admin fill:#EADCF8,stroke:#8E7CC3,stroke-width:2px,color:#111;
+    classDef data fill:#FCE4D6,stroke:#ED7D31,stroke-width:2px,color:#111;
+    classDef integration fill:#FCE4D6,stroke:#ED7D31,stroke-width:2px,color:#111;
+    classDef guard fill:#FFF2CC,stroke:#BF9000,stroke-width:2px,stroke-dasharray: 5 3,color:#111;
+    classDef error fill:#F4CCCC,stroke:#CC0000,stroke-width:2px,color:#111;
+    classDef future fill:#E7E6E6,stroke:#7F7F7F,stroke-width:2px,stroke-dasharray: 5 3,color:#111;
+
+    style FUTURE fill:#F7F7F7,stroke:#A6A6A6,stroke-width:2px,stroke-dasharray: 5 3
+    style LEGEND fill:#FFFFFF,stroke:#B7B7B7,stroke-width:1px
